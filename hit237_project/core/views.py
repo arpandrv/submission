@@ -79,10 +79,15 @@ def create_farm_view(request):
             farm, error = create_farm(farm_data, request.user)
             
             if farm:
+                logger.info(f"Farm '{farm.name}' (ID: {farm.id}) created successfully for user {request.user.username}. Redirecting to farm detail.")
                 messages.success(request, f"Farm '{farm.name}' was created successfully!")
                 return redirect('core:farm_detail', farm_id=farm.id)
             else:
+                logger.error(f"Farm creation failed for user {request.user.username}: {error}")
                 messages.error(request, error or "Could not create farm.")
+        else:
+            logger.warning(f"Farm form validation failed for user {request.user.username}: {form.errors}")
+            messages.error(request, "Please correct the errors below.")
     else:
         form = FarmForm()
     
@@ -93,8 +98,11 @@ def create_farm_view(request):
 def farm_detail_view(request, farm_id):
     farm, error = get_farm_details(farm_id, request.user)
     if error:
+        logger.warning(f"Farm detail access failed for farm_id {farm_id}, user {request.user.username}: {error}")
         messages.error(request, error)
         return redirect('core:myfarms')
+    
+    logger.debug(f"Displaying farm detail for farm '{farm.name}' (ID: {farm.id}) for user {request.user.username}")
 
     recommendations = get_surveillance_recommendations(farm)
     
@@ -107,7 +115,7 @@ def farm_detail_view(request, farm_id):
     except SurveillanceCalculation.DoesNotExist:
         logger.info(f"Farm Detail: No saved calculation for farm {farm.id}. Calculating with default confidence.")
         if recommendations.get('stage_name') != 'Unknown' and farm.total_plants():
-            seasonal_info = get_seasonal_stage_info(farm.region.name if farm.region else None)
+            seasonal_info = get_seasonal_stage_info()
             prevalence_p_for_calc = seasonal_info.get('prevalence_p')
 
             if prevalence_p_for_calc is not None:

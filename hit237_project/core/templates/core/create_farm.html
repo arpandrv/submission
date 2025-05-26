@@ -169,9 +169,15 @@
                         <a href="{% if farm %}{% url 'core:farm_detail' farm.id %}{% else %}{% url 'core:myfarms' %}{% endif %}" class="btn btn-outline-secondary order-md-1 order-2 py-2">
                             <i class="bi bi-x-circle me-1"></i> Cancel
                         </a>
-                        <button type="submit" class="btn btn-primary btn-lg px-4 order-md-2 order-1 py-2">
-                            <i class="bi bi-check-circle-fill me-2"></i>
-                            {% if farm %}Update Farm Details{% else %}Save New Farm{% endif %}
+                        <button type="submit" class="btn btn-primary btn-lg px-4 order-md-2 order-1 py-2" id="submit-btn">
+                            <span class="submit-text">
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                                {% if farm %}Update Farm Details{% else %}Save New Farm{% endif %}
+                            </span>
+                            <span class="submit-loading d-none">
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                {% if farm %}Updating...{% else %}Saving...{% endif %}
+                            </span>
                         </button>
                     </div>
                 </form>
@@ -372,6 +378,37 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     updateFormProgress();
+
+    // Handle form submission
+    if (farmForm) {
+        const submitBtn = document.getElementById('submit-btn');
+        const submitText = submitBtn ? submitBtn.querySelector('.submit-text') : null;
+        const submitLoading = submitBtn ? submitBtn.querySelector('.submit-loading') : null;
+        
+        farmForm.addEventListener('submit', function(e) {
+            // Prevent multiple submissions
+            if (submitBtn && submitBtn.disabled) {
+                e.preventDefault();
+                return false;
+            }
+            
+            // Show loading state
+            if (submitBtn && submitText && submitLoading) {
+                submitBtn.disabled = true;
+                submitText.classList.add('d-none');
+                submitLoading.classList.remove('d-none');
+            }
+            
+            // Re-enable button after a timeout as fallback (in case of network issues)
+            setTimeout(function() {
+                if (submitBtn && submitText && submitLoading) {
+                    submitBtn.disabled = false;
+                    submitText.classList.remove('d-none');
+                    submitLoading.classList.add('d-none');
+                }
+            }, 10000); // 10 seconds timeout
+        });
+    }
 });
 </script>
 {% endblock %}
