@@ -1,0 +1,35 @@
+# === Python and Django ===
+__pycache__/
+*.py[cod]
+# *.sqlite3
+*.log
+
+# === Virtual environment ===
+virtualenv/
+venv/
+env/
+env_submission/
+
+# === Django specific ===
+project/static/
+project/media/
+
+# === Migrations (optional) ===
+project/**/migrations/*.py
+!project/**/migrations/__init__.py
+
+# === Environment files ===
+.env
+*.env
+
+# === IDEs and Editors ===
+.vscode/
+.idea/
+*.code-workspace
+
+# === OS-specific ===
+.DS_Store
+Thumbs.db
+
+# === Node (if using npm/yarn) ===
+node_modules/
