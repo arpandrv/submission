@@ -424,9 +424,6 @@ def start_survey_session_view(request, farm_id):
         messages.error(request, error)
         return redirect('core:myfarms') 
 
-    # REMOVED: Logic to check for existing sessions and resume them
-    # Always create a new session - old incomplete sessions will be cleaned up
-
     # Clean up any incomplete sessions for this farm/user before creating new one
     incomplete_sessions = SurveySession.objects.filter(
         farm=farm, 
@@ -437,24 +434,49 @@ def start_survey_session_view(request, farm_id):
         logger.info(f"Cleaning up {incomplete_sessions.count()} incomplete sessions for farm {farm.id}, user {request.user.username}")
         incomplete_sessions.delete()
 
+    # Get target plants from current calculation
     target_plants = None
     try:
         latest_calc = SurveillanceCalculation.objects.filter(farm=farm, is_current=True).latest('date_created')
         target_plants = latest_calc.required_plants
+        logger.info(f"StartSession: Found calculation with target {target_plants} for farm {farm.id}")
     except SurveillanceCalculation.DoesNotExist:
-        logger.info(f"StartSession: No current calculation found for farm {farm.id}. Target plants will be None.")
+        logger.warning(f"StartSession: No current calculation found for farm {farm.id}. Will calculate default target.")
+        # If no saved calculation, calculate a default one
+        if farm.total_plants():
+            seasonal_info = get_seasonal_stage_info()
+            prevalence_p = seasonal_info.get('prevalence_p')
+            if prevalence_p is not None:
+                calculation_results = calculate_surveillance_effort(
+                    farm=farm,
+                    confidence_level_percent=DEFAULT_CONFIDENCE,
+                    prevalence_p=prevalence_p
+                )
+                if not calculation_results.get('error'):
+                    target_plants = calculation_results['required_plants_to_survey']
+                    logger.info(f"StartSession: Calculated default target {target_plants} for farm {farm.id}")
     except Exception as e:
         logger.error(f"StartSession: Error fetching calculation for farm {farm.id}: {e}")
+
+    # Ensure target is at least 1 if farm has plants
+    if target_plants is None and farm.total_plants() and farm.total_plants() > 0:
+        target_plants = max(1, min(5, farm.total_plants() // 10))  # Default to 10% or minimum 1, max 5
+        logger.info(f"StartSession: Using fallback target {target_plants} for farm {farm.id}")
 
     try:
         new_session = SurveySession.objects.create(
             farm=farm,
             surveyor=request.user,
-            status='in_progress',  # Start immediately as in_progress
+            status='in_progress',
             start_time=timezone.now(),
             target_plants_surveyed=target_plants
         )
-        messages.success(request, f"New survey session started for {farm.name}.")
+        
+        if target_plants:
+            messages.success(request, f"New survey session started for {farm.name}. Target: {target_plants} plants.")
+        else:
+            messages.warning(request, f"New survey session started for {farm.name}. No target set - please record at least 1 observation.")
+            
         return redirect('core:active_survey_session', session_id=new_session.session_id)
     except Exception as e:
         messages.error(request, f"Could not start a new survey session: {e}")
@@ -525,7 +547,6 @@ def active_survey_session_view(request, session_id):
 @login_required
 def create_observation_api(request):
     logger.debug(f"create_observation_api called with POST data: {request.POST}")
-    form = ObservationForm(request.POST)
     session_id = request.POST.get('session_id')
 
     if not session_id:
@@ -541,6 +562,27 @@ def create_observation_api(request):
         logger.error(f"create_observation_api: Survey session {session_id} not found for user {request.user.username}.")
         return JsonResponse({'status': 'error', 'message': 'Survey session not found.'}, status=404)
 
+    # Check if adding this observation would exceed target
+    current_count = session.observation_count()
+    target_plants = session.target_plants_surveyed
+    
+    if target_plants and current_count >= target_plants:
+        logger.warning(f"Attempt to add observation beyond target for session {session_id}. Current: {current_count}, Target: {target_plants}")
+        return JsonResponse({
+            'status': 'error', 
+            'message': f'Cannot add more observations. You have reached the target of {target_plants} plants. Please finish the session.'
+        }, status=400)
+
+    # Create form without requiring plant_sequence_number from user
+    form_data = request.POST.copy()
+    
+    # Auto-generate the next plant sequence number
+    last_obs = Observation.objects.filter(session=session).order_by('-plant_sequence_number').first()
+    next_sequence = (last_obs.plant_sequence_number + 1) if last_obs and last_obs.plant_sequence_number is not None else 1
+    form_data['plant_sequence_number'] = next_sequence
+    
+    form = ObservationForm(form_data)
+    
     if form.is_valid():
         observation_data = form.cleaned_data
         observation_data['pests_observed'] = list(form.cleaned_data['pests_observed'].values_list('id', flat=True))
@@ -552,14 +594,24 @@ def create_observation_api(request):
             obs_data_for_js = obs.to_dict()
             obs_data_for_js['time'] = obs.observation_time.strftime('%I:%M %p')
 
-            return JsonResponse({
+            new_count = session.observation_count()
+            target_reached = target_plants and new_count >= target_plants
+
+            response_data = {
                 'status': 'success',
                 'message': 'Observation saved.',
                 'observation': obs_data_for_js,
-                'observation_count': session.observation_count(),
+                'observation_count': new_count,
                 'unique_pests': session.get_unique_pests().count(),
-                'unique_diseases': session.get_unique_diseases().count()
-            })
+                'unique_diseases': session.get_unique_diseases().count(),
+                'target_reached': target_reached,
+                'next_sequence_number': next_sequence + 1
+            }
+            
+            if target_reached:
+                response_data['message'] = f'Observation saved. Target of {target_plants} plants reached! You can now finish the session.'
+
+            return JsonResponse(response_data)
         else:
             logger.error(f"Error creating observation via service for session {session.id}: {error}")
             return JsonResponse({'status': 'error', 'message': error or "Could not save observation."}, status=500)

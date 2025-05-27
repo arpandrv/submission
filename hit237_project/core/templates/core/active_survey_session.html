@@ -64,6 +64,47 @@
     border-left: 4px solid #2196f3;
   }
 
+  /* Current Plant Display */
+  .current-plant-display {
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #ffc107;
+    text-align: center;
+  }
+
+  .plant-number-display {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #856404;
+    margin: 0;
+  }
+
+  /* Form disabled state */
+  .form-disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  /* Target reached banner */
+  .target-reached-banner {
+    background: linear-gradient(135deg, #d1e7dd, #a3cfbb);
+    border: 2px solid #28a745;
+    color: #0f5132;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    text-align: center;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+  }
+
   .form-check-scrollable {
     max-height: 150px;
     overflow-y: auto;
@@ -122,25 +163,6 @@
   .finish-button:not(:disabled):hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-  }
-
-  /* Target Reached Indicator */
-  .target-reached {
-    background: linear-gradient(135deg, #d1e7dd, #a3cfbb);
-    border: 1px solid #28a745;
-    color: #0f5132;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
-  }
-
-  .target-exceeded {
-    background: linear-gradient(135deg, #f8d7da, #f1aeb5);
-    border: 1px solid #dc3545;
-    color: #721c24;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
   }
 
   @media (max-width: 767.98px) {
@@ -252,19 +274,14 @@
 
                 <!-- Progress Status Messages -->
                 {% if completed_plants >= target_plants %}
-                    <div class="target-reached">
+                    <div class="target-reached-banner" id="target-reached-banner">
                         <i class="bi bi-check-circle-fill me-2"></i>
                         <strong>Target Reached!</strong> You can now finish the survey session.
                     </div>
-                {% elif completed_plants > target_plants %}
-                    <div class="target-exceeded">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                        <strong>Target Exceeded!</strong> You've surveyed more plants than required.
-                    </div>
                 {% else %}
-                    <div class="alert alert-info py-2">
+                    <div class="alert alert-info py-2" id="progress-info">
                         <i class="bi bi-info-circle me-1"></i>
-                        <strong>{{ target_plants|add:"-"|add:completed_plants }}</strong> more plants needed to reach target.
+                        <strong id="remaining-count">{{ target_plants|add:"-"|add:completed_plants }}</strong> more plants needed to reach target.
                     </div>
                 {% endif %}
             {% else %}
@@ -308,18 +325,24 @@
   {# --- Right Column: Observation Form & List --- #}
   <div class="col-md-8">
     
+    {# Target Reached Banner (duplicate for mobile) #}
+    {% if completed_plants >= target_plants and target_plants > 0 %}
+    <div class="target-reached-banner d-md-none mb-3" id="mobile-target-reached-banner">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <strong>Target Reached!</strong><br>
+        <small>You can now finish the survey session.</small>
+    </div>
+    {% endif %}
+    
     {# Observation Recording Form Area #}
-    <div class="observation-form-area">
+    <div class="observation-form-area" id="observation-form-area">
         <h4><i class="bi bi-plus-circle-fill me-1"></i> Record New Observation</h4>
-        <p class="text-muted small">Record findings for the current plant. Assign a sequence number before saving.</p>
         
-        <!-- Prevent Over-surveying Warning -->
-        {% if target_plants > 0 and completed_plants >= target_plants %}
-        <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            <strong>Target Reached:</strong> You've surveyed {{ completed_plants }} of {{ target_plants }} required plants. You can finish the session or continue if needed.
+        <!-- Current Plant Display -->
+        <div class="current-plant-display" id="current-plant-display">
+            <p class="mb-1 text-muted">Now inspecting plant:</p>
+            <p class="plant-number-display" id="current-plant-number">{{ completed_plants|add:1 }}</p>
         </div>
-        {% endif %}
         
         <hr>
         
@@ -327,20 +350,8 @@
             <form id="observation-form" method="post" data-session-id="{{ session.session_id }}">
                 {% csrf_token %}
                 
-                {# Plant Sequence Number - Now a visible, required field #}
-                <div class="mb-3">
-                    <label for="{{ form.plant_sequence_number.id_for_label }}" class="form-label fw-bold">
-                        {{ form.plant_sequence_number.label }}:
-                        <span class="text-danger">*</span> {# Indicate required #}
-                    </label>
-                    {{ form.plant_sequence_number }}
-                    {% if form.plant_sequence_number.help_text %}
-                        <div class="form-text">{{ form.plant_sequence_number.help_text }}</div>
-                    {% endif %}
-                    {% for error in form.plant_sequence_number.errors %}
-                        <div class="invalid-feedback d-block">{{ error }}</div>
-                    {% endfor %}
-                </div>
+                {# Hidden plant sequence number field #}
+                {{ form.plant_sequence_number }}
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">{{ form.pests_observed.label }}</label>
@@ -375,7 +386,7 @@
                 <button type="submit" id="save-observation-btn" class="btn btn-success btn-lg">
                      <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="display: none;"></span>
                      <i class="bi bi-check-lg me-1"></i> 
-                     <span class="button-text">Save Observation</span>
+                     <span class="button-text">Save Observation for Plant <span id="save-btn-plant-number">{{ completed_plants|add:1 }}</span></span>
                 </button>
                 <span id="save-status" class="ms-2"></span>
             </form>
@@ -384,7 +395,7 @@
         {% endif %}
         
          <div class="alert alert-info small mt-3 p-2" role="alert">
-            <i class="bi bi-lightbulb me-1"></i> <strong>Instructions:</strong> Enter the plant number, select any pests or diseases found, add optional notes, and click "Save Observation".
+            <i class="bi bi-lightbulb me-1"></i> <strong>Instructions:</strong> Select any pests or diseases found on the current plant, add optional notes, and click "Save Observation".
         </div>
     </div>
 
@@ -457,13 +468,14 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Fixed active survey session page loaded.");
+    console.log("Enhanced active survey session page loaded.");
 
     const form = document.getElementById('observation-form');
     const saveBtn = document.getElementById('save-observation-btn');
     const finishBtn = document.getElementById('finish-session-btn');
     const finishBtnText = document.getElementById('finish-btn-text');
     const saveStatusSpan = document.getElementById('save-status');
+    const formArea = document.getElementById('observation-form-area');
     
     // CSRF token for AJAX
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -475,13 +487,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const observationCountDisplay = document.getElementById('observation-count-display');
     const uniquePestsCountDisplay = document.getElementById('unique-pests-count-display');
     const uniqueDiseasesCountDisplay = document.getElementById('unique-diseases-count-display');
+    const currentPlantNumber = document.getElementById('current-plant-number');
+    const saveBtnPlantNumber = document.getElementById('save-btn-plant-number');
     
-    // Progress bar elements
+    // Progress elements
     const mobileProgressBar = document.querySelector('.mobile-session-header .progress-fill');
     const mobileProgressText = document.querySelector('.mobile-session-header .progress-text');
     const desktopProgressBar = document.getElementById('desktop-progress-bar');
     const desktopProgressText = document.getElementById('desktop-progress-text');
     const targetObsCount = JSON.parse(document.getElementById('target-plants-data').textContent);
+    const remainingCountSpan = document.getElementById('remaining-count');
+    const progressInfo = document.getElementById('progress-info');
+    const targetReachedBanner = document.getElementById('target-reached-banner');
+    const mobileTargetReachedBanner = document.getElementById('mobile-target-reached-banner');
 
     function updateFinishButtonState(currentCount) {
         if (targetObsCount > 0) {
@@ -498,6 +516,53 @@ document.addEventListener('DOMContentLoaded', function() {
             // No target set, can always finish
             finishBtn.disabled = false;
             finishBtnText.textContent = 'Finish Survey Session';
+        }
+    }
+
+    function updateCurrentPlantDisplay(nextPlantNumber) {
+        if (currentPlantNumber) {
+            currentPlantNumber.textContent = nextPlantNumber;
+        }
+        if (saveBtnPlantNumber) {
+            saveBtnPlantNumber.textContent = nextPlantNumber;
+        }
+    }
+
+    function updateProgressBars(currentCount) {
+        const currentProgress = targetObsCount > 0 ? Math.min(100, Math.round((currentCount / targetObsCount) * 100)) : 0;
+        const progressTextContent = targetObsCount > 0 ? `${currentCount}/${targetObsCount}` : `${currentCount}`;
+
+        if (mobileProgressBar) mobileProgressBar.style.width = `${currentProgress}%`;
+        if (mobileProgressText) mobileProgressText.textContent = targetObsCount > 0 ? `${currentProgress}%` : progressTextContent;
+        
+        if (desktopProgressBar) desktopProgressBar.style.width = `${currentProgress}%`;
+        if (desktopProgressText) desktopProgressText.textContent = targetObsCount > 0 ? `${currentProgress}%` : progressTextContent;
+    }
+
+    function updateTargetProgress(currentCount) {
+        if (targetObsCount > 0) {
+            const remaining = targetObsCount - currentCount;
+            
+            if (remaining <= 0) {
+                // Target reached - show banner, hide progress info
+                if (progressInfo) progressInfo.style.display = 'none';
+                if (targetReachedBanner) targetReachedBanner.style.display = 'block';
+                if (mobileTargetReachedBanner) mobileTargetReachedBanner.style.display = 'block';
+                
+                // Disable form
+                if (formArea) formArea.classList.add('form-disabled');
+                if (saveBtn) saveBtn.disabled = true;
+            } else {
+                // Update remaining count
+                if (remainingCountSpan) remainingCountSpan.textContent = remaining;
+                if (progressInfo) progressInfo.style.display = 'block';
+                if (targetReachedBanner) targetReachedBanner.style.display = 'none';
+                if (mobileTargetReachedBanner) mobileTargetReachedBanner.style.display = 'none';
+                
+                // Enable form
+                if (formArea) formArea.classList.remove('form-disabled');
+                if (saveBtn) saveBtn.disabled = false;
+            }
         }
     }
 
@@ -527,23 +592,24 @@ document.addEventListener('DOMContentLoaded', function() {
         observationList.insertBefore(li, observationList.firstChild);
     }
 
-    function updateSessionStats(newObservationCount, newUniquePests, newUniqueDiseases) {
+    function updateSessionStats(newObservationCount, newUniquePests, newUniqueDiseases, nextSequenceNumber) {
         if (observationCountDisplay) observationCountDisplay.textContent = newObservationCount;
         if (uniquePestsCountDisplay) uniquePestsCountDisplay.textContent = newUniquePests;
         if (uniqueDiseasesCountDisplay) uniqueDiseasesCountDisplay.textContent = newUniqueDiseases;
 
         // Update progress bars
-        const currentProgress = targetObsCount > 0 ? Math.min(100, Math.round((newObservationCount / targetObsCount) * 100)) : 0;
-        const progressTextContent = targetObsCount > 0 ? `${newObservationCount}/${targetObsCount}` : `${newObservationCount}`;
-
-        if (mobileProgressBar) mobileProgressBar.style.width = `${currentProgress}%`;
-        if (mobileProgressText) mobileProgressText.textContent = targetObsCount > 0 ? `${currentProgress}%` : progressTextContent;
-        
-        if (desktopProgressBar) desktopProgressBar.style.width = `${currentProgress}%`;
-        if (desktopProgressText) desktopProgressText.textContent = targetObsCount > 0 ? `${currentProgress}%` : progressTextContent;
+        updateProgressBars(newObservationCount);
         
         // Update finish button state
         updateFinishButtonState(newObservationCount);
+        
+        // Update target progress
+        updateTargetProgress(newObservationCount);
+        
+        // Update current plant display for next observation
+        if (nextSequenceNumber) {
+            updateCurrentPlantDisplay(nextSequenceNumber);
+        }
     }
     
     function highlightRecommendedItems() {
@@ -607,24 +673,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     const result = await response.json();
                     console.log('Observation saved successfully:', result);
                     if (saveStatusSpan) {
-                        saveStatusSpan.textContent = 'Observation saved!';
-                        saveStatusSpan.className = 'ms-2 text-success small';
+                        saveStatusSpan.textContent = result.target_reached ? 'Target reached!' : 'Observation saved!';
+                        saveStatusSpan.className = result.target_reached ? 'ms-2 text-success small fw-bold' : 'ms-2 text-success small';
                     }
                     addObservationToUI(result.observation);
-                    updateSessionStats(result.observation_count, result.unique_pests, result.unique_diseases);
-                    form.reset();
-                    highlightRecommendedItems();
+                    updateSessionStats(result.observation_count, result.unique_pests, result.unique_diseases, result.next_sequence_number);
                     
-                    const plantSeqInput = document.getElementById('id_plant_sequence_number');
-                    if (plantSeqInput) plantSeqInput.focus();
+                    // Reset form but keep checkboxes and notes cleared
+                    const pestCheckboxes = form.querySelectorAll('input[name="pests_observed"]');
+                    const diseaseCheckboxes = form.querySelectorAll('input[name="diseases_observed"]');
+                    const notesField = form.querySelector('textarea[name="notes"]');
+                    
+                    pestCheckboxes.forEach(cb => cb.checked = false);
+                    diseaseCheckboxes.forEach(cb => cb.checked = false);
+                    if (notesField) notesField.value = '';
+                    
+                    highlightRecommendedItems();
 
                 } else {
                     const errorData = await response.json();
                     console.error('Error saving observation:', response.status, errorData);
                     let errorMsg = errorData.message || 'Error saving observation.';
-                    if (errorData.errors && errorData.errors.plant_sequence_number) {
-                        errorMsg = errorData.errors.plant_sequence_number[0].message || errorData.errors.plant_sequence_number[0];
-                    }
                     if (saveStatusSpan) {
                         saveStatusSpan.textContent = errorMsg;
                         saveStatusSpan.className = 'ms-2 text-danger small';
@@ -640,7 +709,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 saveBtn.disabled = false;
                 if (spinner) spinner.style.display = 'none';
                 if (buttonIcon) buttonIcon.style.display = 'inline-block';
-                if (buttonTextSpan) buttonTextSpan.textContent = 'Save Observation';
+                if (buttonTextSpan) {
+                    const currentPlantNum = parseInt(currentPlantNumber?.textContent || '1');
+                    buttonTextSpan.innerHTML = `Save Observation for Plant <span id="save-btn-plant-number">${currentPlantNum}</span>`;
+                }
                 setTimeout(() => {
                     if (saveStatusSpan) saveStatusSpan.textContent = '';
                 }, 3000);
@@ -694,7 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const initialObsCount = JSON.parse(document.getElementById('completed-plants-data').textContent);
     const initialPests = parseInt(uniquePestsCountDisplay?.textContent || '0');
     const initialDiseases = parseInt(uniqueDiseasesCountDisplay?.textContent || '0');
-    updateSessionStats(initialObsCount, initialPests, initialDiseases);
+    updateSessionStats(initialObsCount, initialPests, initialDiseases, initialObsCount + 1);
     highlightRecommendedItems();
 });
 </script>

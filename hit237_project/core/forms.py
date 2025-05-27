@@ -144,12 +144,11 @@ class ObservationForm(forms.ModelForm):
         widget=forms.Textarea(attrs={'rows': 3}),
         required=False
     )
+    # Make plant_sequence_number hidden and not required from user input
     plant_sequence_number = forms.IntegerField(
-        required=True, 
-        min_value=1,
-        label="Plant Sequence Number",
-        help_text="Enter the number of the plant you just checked (e.g., 1, 5, 10...).",
-        widget=forms.NumberInput(attrs={'min': '1'})
+        required=False,  # Changed to False since it's auto-generated
+        widget=forms.HiddenInput(),  # Hidden since it's auto-generated
+        min_value=1
     )
 
     class Meta:
@@ -158,5 +157,5 @@ class ObservationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['plant_sequence_number'].widget.attrs.update({'class': 'form-control'})
+        # Remove the old styling since it's now hidden
         self.fields['notes'].widget.attrs.update({'class': 'form-control'})

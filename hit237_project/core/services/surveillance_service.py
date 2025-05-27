@@ -1,3 +1,5 @@
+# Updated surveillance_service.py
+
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from django.utils import timezone
@@ -14,22 +16,42 @@ def create_observation(
 ) -> Tuple[Optional[Observation], Optional[str]]:
     """Creates a new completed observation within a survey session."""
     try:
+        # Check if we're exceeding the target
+        current_count = session.observation_count()
+        target_plants = session.target_plants_surveyed
+        
+        if target_plants and current_count >= target_plants:
+            return None, f"Cannot add observation. Target of {target_plants} plants already reached."
+        
         observation = Observation(
             session=session,
             observation_time=timezone.now(),
             status='completed'
         )
 
-        for field in ['notes', 'plant_sequence_number']:
-            if field in data:
-                setattr(observation, field, data[field])
+        # Handle notes
+        if 'notes' in data:
+            observation.notes = data['notes']
         
-        if not data.get('plant_sequence_number'):
+        # Handle plant sequence number - ensure it's always set properly
+        plant_sequence_number = data.get('plant_sequence_number')
+        if plant_sequence_number and plant_sequence_number > 0:
+            # Check if this sequence number is already used in this session
+            existing_obs = Observation.objects.filter(
+                session=session, 
+                plant_sequence_number=plant_sequence_number
+            ).first()
+            if existing_obs:
+                return None, f"Plant sequence number {plant_sequence_number} has already been used in this session."
+            observation.plant_sequence_number = plant_sequence_number
+        else:
+            # Auto-generate the next sequence number
             last_obs = Observation.objects.filter(session=session).order_by('-plant_sequence_number').first()
             observation.plant_sequence_number = (last_obs.plant_sequence_number + 1) if last_obs and last_obs.plant_sequence_number is not None else 1
 
         observation.save()
 
+        # Set many-to-many relationships
         pest_ids = data.get('pests_observed', [])
         if pest_ids:
             observation.pests_observed.set(pest_ids)
@@ -38,7 +60,7 @@ def create_observation(
         if disease_ids:
             observation.diseases_observed.set(disease_ids)
         
-        logger.info(f"Observation {observation.id} created for session {session.session_id}.")
+        logger.info(f"Observation {observation.id} created for session {session.session_id}, plant #{observation.plant_sequence_number}")
         return observation, None
 
     except Exception as e:
