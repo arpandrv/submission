@@ -1,4 +1,3 @@
-# core/services/user_service.py
 import logging
 from typing import Dict, Any, Optional, Tuple
 from django.contrib.auth.models import User
@@ -24,12 +23,12 @@ def create_user_with_profile(user_data: Dict[str, Any]) -> Tuple[Optional[User],
         email = user_data.get('email')
         password = user_data.get('password')
         
-        # Extract profile fields
-        farm_name = user_data.get('farm_name')
+        # Extract profile fields (business_name is now optional)
+        business_name = user_data.get('business_name', f"{username}'s Mango Business" if username else "Mango Growing Business")
         contact_number = user_data.get('contact_number')
         
-        # Validate required fields
-        if not username or not email or not password or not farm_name:
+        # Validate required fields (removed farm_name/business_name from required)
+        if not username or not email or not password:
             missing = []
             if not username:
                 missing.append('username')
@@ -37,8 +36,6 @@ def create_user_with_profile(user_data: Dict[str, Any]) -> Tuple[Optional[User],
                 missing.append('email')
             if not password:
                 missing.append('password')
-            if not farm_name:
-                missing.append('farm name')
             return None, f"Missing required fields: {', '.join(missing)}"
         
         # Check if user already exists
@@ -55,10 +52,10 @@ def create_user_with_profile(user_data: Dict[str, Any]) -> Tuple[Optional[User],
             password=password
         )
         
-        # Create grower profile
+        # Create grower profile with business_name
         Grower.objects.create(
             user=user,
-            farm_name=farm_name,
+            business_name=business_name,
             contact_number=contact_number
         )
         
@@ -103,8 +100,8 @@ def update_user_profile(user: User, user_data: Dict[str, Any]) -> Tuple[bool, Op
         try:
             grower = user.grower_profile
             
-            if 'farm_name' in user_data:
-                grower.farm_name = user_data['farm_name']
+            if 'business_name' in user_data:
+                grower.business_name = user_data['business_name']
             
             if 'contact_number' in user_data:
                 grower.contact_number = user_data['contact_number']
@@ -114,12 +111,12 @@ def update_user_profile(user: User, user_data: Dict[str, Any]) -> Tuple[bool, Op
         except Grower.DoesNotExist:
             logger.warning(f"No grower profile found for user {user.username}")
             # Create profile if it doesn't exist
-            if 'farm_name' in user_data:
-                Grower.objects.create(
-                    user=user,
-                    farm_name=user_data.get('farm_name', 'My Farm'),
-                    contact_number=user_data.get('contact_number', '')
-                )
+            business_name = user_data.get('business_name', f"{user.username}'s Mango Business")
+            Grower.objects.create(
+                user=user,
+                business_name=business_name,
+                contact_number=user_data.get('contact_number', '')
+            )
         
         return True, None
     

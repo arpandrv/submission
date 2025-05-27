@@ -12,7 +12,7 @@ class SignUpForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput)
     confirm_password = forms.CharField(widget=forms.PasswordInput)
     email = forms.EmailField(required=True)
-    farm_name = forms.CharField(max_length=100, required=True)
+    # Removed farm_name field - users will add actual farms after registration
     contact_number = forms.CharField(max_length=20, required=False)
 
     class Meta:
@@ -33,7 +33,7 @@ class SignUpForm(forms.ModelForm):
             user.save()
             Grower.objects.create(
                 user=user,
-                farm_name=self.cleaned_data.get('farm_name'),
+                business_name=f"{user.username}'s Mango Business",  # Provide default business name
                 contact_number=self.cleaned_data.get('contact_number')
             )
         return user
@@ -96,7 +96,13 @@ class UserEditForm(forms.ModelForm):
 class GrowerProfileEditForm(forms.ModelForm):
     class Meta:
         model = Grower
-        fields = ['farm_name', 'contact_number']
+        fields = ['business_name', 'contact_number']
+        labels = {
+            'business_name': 'Business/Company Name',
+        }
+        help_texts = {
+            'business_name': 'The name of your mango growing business or company',
+        }
 
 
 class CalculatorForm(forms.Form):

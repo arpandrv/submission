@@ -40,11 +40,11 @@ OBSERVATION_STATUS_CHOICES = [
 
 class Grower(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='grower_profile')
-    farm_name = models.CharField(max_length=100)
+    business_name = models.CharField(max_length=100, default='Mango Growing Business')  # Changed from farm_name
     contact_number = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.username}'s Profile ({self.farm_name})"
+        return f"{self.user.username}'s Profile ({self.business_name})"
     
     def recent_survey_sessions(self, limit=5):
         return SurveySession.objects.filter(
