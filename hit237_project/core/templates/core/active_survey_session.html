@@ -263,7 +263,7 @@
                 <div class="progress-container mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="fw-bold">Current Progress:</span>
-                        <span class="fw-bold">{{ completed_plants }}/{{ target_plants }}</span>
+                        <span class="fw-bold" id="progress-fraction-text">{{ completed_plants }}/{{ target_plants }}</span>
                     </div>
                     <div class="progress-bar-custom">
                         <div class="progress-fill" style="width: {{ progress_percent }}%;" id="desktop-progress-bar">
@@ -308,15 +308,33 @@
              <p class="text-muted mb-2">Current Stage: <strong>{{ current_stage_name|default:'Unknown' }}</strong></p>
             {% if recommended_pests %}
                 <strong>Priority Pests:</strong>
-                <ul class="list-inline">{% for p in recommended_pests %}<li class="list-inline-item"><span class="badge bg-danger-subtle text-danger-emphasis">{{ p.name }}</span></li>{% endfor %}</ul>
+                <ul class="list-inline">
+                    {% for p in recommended_pests %}
+                        <li class="list-inline-item">
+                            <span class="badge bg-danger-subtle text-danger-emphasis">{{ p.name }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
             {% endif %}
             {% if recommended_diseases %}
                 <strong>Priority Diseases:</strong>
-                <ul class="list-inline">{% for d in recommended_diseases %}<li class="list-inline-item"><span class="badge bg-warning-subtle text-warning-emphasis">{{ d.name }}</span></li>{% endfor %}</ul>
+                <ul class="list-inline">
+                    {% for d in recommended_diseases %}
+                        <li class="list-inline-item">
+                            <span class="badge bg-warning-subtle text-warning-emphasis">{{ d.name }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
             {% endif %}
             {% if recommended_parts %}
                 <strong>Key Plant Parts:</strong>
-                <ul class="list-inline">{% for part in recommended_parts %}<li class="list-inline-item"><span class="badge bg-success-subtle text-success-emphasis">{{ part.name }}</span></li>{% endfor %}</ul>
+                <ul class="list-inline">
+                    {% for part in recommended_parts %}
+                        <li class="list-inline-item">
+                            <span class="badge bg-success-subtle text-success-emphasis">{{ part.name }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
             {% endif %}
         </div>
     </div>
@@ -358,7 +376,9 @@
                     <div class="form-check-scrollable border rounded p-2">
                         {{ form.pests_observed }}
                     </div>
-                    {% for error in form.pests_observed.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    {% for error in form.pests_observed.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
                 </div>
 
                 <div class="mb-3">
@@ -366,7 +386,9 @@
                     <div class="form-check-scrollable border rounded p-2">
                         {{ form.diseases_observed }}
                     </div>
-                    {% for error in form.diseases_observed.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    {% for error in form.diseases_observed.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
                 </div>
 
                 {# Collapsible Notes #}
@@ -378,7 +400,9 @@
                       <div class="card card-body p-2">
                          {{ form.notes.label_tag }}
                          {{ form.notes }}
-                         {% for error in form.notes.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                         {% for error in form.notes.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                         {% endfor %}
                       </div>
                     </div>
                 </div>
@@ -440,9 +464,23 @@
             <li class="list-group-item" data-observation-id="{{ obs.id }}">
                 <strong>Plant #{{ obs.plant_sequence_number }}</strong> (Time: {{ obs.observation_time|date:"P" }})
                 <br>
-                {% if obs.pests_observed.all %} Pests: {% for pest in obs.pests_observed.all %}<span class="badge bg-danger-subtle text-danger-emphasis me-1">{{ pest.name }}</span>{% endfor %}<br>{% endif %}
-                {% if obs.diseases_observed.all %} Diseases: {% for disease in obs.diseases_observed.all %}<span class="badge bg-warning-subtle text-warning-emphasis me-1">{{ disease.name }}</span>{% endfor %}<br>{% endif %}
-                {% if obs.notes %}<small class="text-muted d-block">Notes: {{ obs.notes|truncatewords:15 }}</small>{% endif %}
+                {% if obs.pests_observed.all %}
+                    Pests: 
+                    {% for pest in obs.pests_observed.all %}
+                        <span class="badge bg-danger-subtle text-danger-emphasis me-1">{{ pest.name }}</span>
+                    {% endfor %}
+                    <br>
+                {% endif %}
+                {% if obs.diseases_observed.all %}
+                    Diseases: 
+                    {% for disease in obs.diseases_observed.all %}
+                        <span class="badge bg-warning-subtle text-warning-emphasis me-1">{{ disease.name }}</span>
+                    {% endfor %}
+                    <br>
+                {% endif %}
+                {% if obs.notes %}
+                    <small class="text-muted d-block">Notes: {{ obs.notes|truncatewords:15 }}</small>
+                {% endif %}
             </li>
             {% empty %}
                 <div id="observation-list-empty" class="card-body text-center text-muted">
@@ -495,6 +533,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileProgressText = document.querySelector('.mobile-session-header .progress-text');
     const desktopProgressBar = document.getElementById('desktop-progress-bar');
     const desktopProgressText = document.getElementById('desktop-progress-text');
+    const progressFractionText = document.getElementById('progress-fraction-text');
     const targetObsCount = JSON.parse(document.getElementById('target-plants-data').textContent);
     const remainingCountSpan = document.getElementById('remaining-count');
     const progressInfo = document.getElementById('progress-info');
@@ -537,6 +576,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (desktopProgressBar) desktopProgressBar.style.width = `${currentProgress}%`;
         if (desktopProgressText) desktopProgressText.textContent = targetObsCount > 0 ? `${currentProgress}%` : progressTextContent;
+        
+        // Update the progress fraction text (e.g., "5/25")
+        if (progressFractionText && targetObsCount > 0) {
+            progressFractionText.textContent = `${currentCount}/${targetObsCount}`;
+        }
     }
 
     function updateTargetProgress(currentCount) {
