@@ -248,11 +248,11 @@ class Farm(models.Model):
         if not last_date:
             return timezone.now().date()  # Due immediately if never surveyed
         
-        # Use 30-day cycle (can be made configurable)
+        # Use 14-day cycle (changed from 30-day cycle)
         if isinstance(last_date, datetime):
             last_date = last_date.date()
         
-        next_due = last_date + timedelta(days=30)
+        next_due = last_date + timedelta(days=14)  # Changed from 30 to 14
         today = timezone.now().date()
         
         return max(next_due, today)  # Return today if already overdue
@@ -266,9 +266,9 @@ class Farm(models.Model):
         days_since = self.days_since_last_surveillance()
         if days_since is None:
             return 'never_surveyed'
-        elif days_since > 30:
+        elif days_since > 14:  # Changed from 30 to 14
             return 'overdue'
-        elif days_since > 21:  # Warning at 3 weeks
+        elif days_since > 10:  # Changed from 21 to 10 (warning at ~10 days for 14-day cycle)
             return 'due_soon'
         else:
             return 'up_to_date'

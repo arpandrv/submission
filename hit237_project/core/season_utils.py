@@ -80,4 +80,4 @@ def get_surveillance_frequency():
     """
         Returns: Number of days between surveillance checks (always 7)
     """
-    return 7  # Weekly surveillance for all stages
+    return 14  # Weekly surveillance for all stages

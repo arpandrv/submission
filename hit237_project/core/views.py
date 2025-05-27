@@ -672,19 +672,19 @@ def survey_session_detail_view(request, session_id):
 def delete_survey_session_view(request, session_id):
     session = get_object_or_404(SurveySession, session_id=session_id, surveyor=request.user)
     farm = session.farm
-
-    if session.status not in ['not_started', 'in_progress']:
-        messages.error(request, "Only ongoing or unstarted sessions can be deleted. Completed sessions are part of the record.")
-        return redirect('core:survey_session_list', farm_id=farm.id)
-
+    
     if request.method == 'POST':
+        # Store session info for the success message
         start_time_str = session.start_time.strftime('%Y-%m-%d %H:%M')
         obs_count = session.observation_count()
+        session_status = session.get_status_display()
         
+        # Delete the session and all associated observations
         session.delete()
         
-        messages.success(request, f"Survey session from {start_time_str} (had {obs_count} recorded observations) was deleted.")
+        messages.success(request, f"Survey session from {start_time_str} ({session_status}, {obs_count} observations) was deleted successfully.")
         return redirect('core:survey_session_list', farm_id=farm.id)
     
+    # If not POST, redirect back to session list (shouldn't normally happen with the modal)
     messages.warning(request, "Invalid request to delete session.")
     return redirect('core:survey_session_list', farm_id=farm.id)
